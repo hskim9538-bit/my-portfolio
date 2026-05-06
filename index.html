@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>내 포트폴리오 · US Stocks</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #060810; --surface: #0d1117; --card: #161b27; --border: #1e2d45;
+    --accent: #00d4ff; --green: #00ff9d; --red: #ff4466; --yellow: #ffd700;
+    --text: #cdd6f4; --muted: #45526a; --dim: #8899aa;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; min-height: 100vh; }
+  .app { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* 헤더 */
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
+  .header-title { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .live-dot { font-size: 10px; margin-left: 8px; }
+  .btn-ticker { background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+  /* 가격바 */
+  .price-bar { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 14px; }
+  .price-name { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .price-main { display: flex; align-items: baseline; gap: 8px; }
+  .price-num { font-size: 24px; font-weight: 700; }
+  .price-chg { font-size: 13px; }
+  .price-avg { font-size: 10px; color: var(--dim); margin-top: 3px; }
+  .sig-badge { border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-align: center; min-width: 72px; }
+  .sig-sub { font-size: 9px; margin-top: 2px; opacity: 0.8; }
+
+  /* 탭 콘텐츠 */
+  .content { flex: 1; overflow-y: auto; padding: 14px 14px 80px; }
+  .tab-pane { display: none; flex-direction: column; gap: 12px; }
+  .tab-pane.active { display: flex; }
+
+  /* 카드 */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card-title { font-size: 10px; color: var(--muted); margin-bottom: 10px; letter-spacing: 0.1em; }
+
+  /* 2배 트래커 */
+  .tracker { background: linear-gradient(135deg,#0d1b2a,#1a2744); border: 1px solid #00d4ff44; border-radius: 10px; padding: 14px; }
+  .tracker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .tracker-label { font-size: 10px; color: var(--muted); }
+  .tracker-val { font-size: 15px; font-weight: 700; }
+  .progress-bar { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 4px; transition: width 0.5s; }
+  .progress-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+
+  /* 요약 그리드 */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .summary-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .summary-label { font-size: 10px; color: var(--muted); }
+  .summary-val { font-size: 14px; font-weight: 700; margin-top: 2px; }
+
+  /* 종목 카드 */
+  .stock-card { border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+  .stock-header { display: flex; justify-content: space-between; }
+  .stock-left .ticker { font-weight: 700; color: var(--accent); font-size: 15px; }
+  .stock-left .info { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stock-left .prices { font-size: 11px; color: var(--dim); margin-top: 1px; }
+  .stock-right { text-align: right; }
+  .stock-right .mkt { font-weight: 700; font-size: 14px; }
+  .stock-right .pnl { font-size: 12px; margin-top: 2px; }
+  .rsi-row { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+  .rsi-track { flex: 1; background: var(--border); border-radius: 3px; height: 5px; }
+  .rsi-fill { height: 100%; border-radius: 3px; }
+  .rsi-num { font-size: 10px; }
+
+  /* 차트 */
+  .chart-info { display: flex; gap: 10px; margin-top: 10px; font-size: 10px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #1e2d4533; font-size: 13px; }
+
+  /* RSI 게이지 */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+  .gauge-label { font-size: 10px; margin-top: 4px; }
+
+  /* 지표 그리드 */
+  .ind-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ma-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; }
+  .rsi-all-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #1e2d4533; }
+  .rsi-all-ticker { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 44px; }
+  .rsi-all-track { flex: 1; background: var(--border); border-radius: 3px; height: 6px; }
+
+  /* AI 채팅 */
+  .ai-notice { background: #0d1b2a; border: 1px solid #00d4ff33; border-radius: 8px; padding: 10px 14px; font-size: 11px; color: var(--dim); line-height: 1.6; }
+  .quick-btn { background: #00d4ff22; border: 1px solid #00d4ff33; color: var(--accent); padding: 11px 14px;
+    border-radius: 8px; cursor: pointer; font-size: 12px; font-family: inherit; text-align: left; width: 100%; }
+  .quick-btn:hover { background: #00d4ff33; }
+  .chat-area { display: flex; flex-direction: column; gap: 10px; }
+  .chat-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
+  .chat-row { display: flex; }
+  .chat-row.user { justify-content: flex-end; }
+  .chat-bubble { padding: 10px 14px; border-radius: 10px; max-width: 92%; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+  .chat-bubble.user { background: #00d4ff22; border: 1px solid #00d4ff44; }
+  .chat-bubble.ai { background: var(--card); border: 1px solid var(--border); }
+  .ai-label { font-size: 9px; color: var(--accent); margin-bottom: 4px; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 12px 14px; border-radius: 8px; font-family: inherit; font-size: 13px; outline: none; }
+  .send-btn { background: var(--accent); color: #000; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; }
+  .send-btn:disabled { background: var(--muted); cursor: not-allowed; }
+  .clear-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; width: 100%; font-family: inherit; }
+
+  /* 드롭다운 */
+  .overlay { position: fixed; inset: 0; z-index: 100; background: #000000aa; }
+  .dropdown { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); width: 88%; max-width: 360px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .drop-item { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #1e2d4522; cursor: pointer; }
+  .drop-item:hover { background: #00d4ff11; }
+  .drop-item.active { background: #00d4ff22; }
+  .drop-ticker { font-weight: 700; }
+  .drop-name { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .badge { font-size: 8px; padding: 1px 5px; border-radius: 3px; margin-left: 6px; }
+
+  /* 하단 탭바 */
+  .tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px;
+    background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 50; }
+  .tab-btn { flex: 1; padding: 10px 0 8px; border: none; background: transparent; color: var(--muted);
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-family: inherit;
+    border-top: 2px solid transparent; }
+  .tab-btn.active { color: var(--accent); border-top-color: var(--accent); }
+  .tab-icon { font-size: 16px; }
+  .tab-label { font-size: 9px; }
+
+  /* 로딩 */
+  .loading { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+  /* API 키 화면 */
+  .key-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .key-box { width: 100%; max-width: 340px; }
+  .key-emoji { font-size: 36px; text-align: center; display: block; margin-bottom: 12px; }
+  .key-title { font-size: 17px; font-weight: 700; color: var(--accent); text-align: center; margin-bottom: 6px; }
+  .key-desc { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 24px; line-height: 1.7; }
+  .key-input { width: 100%; background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 13px 14px; border-radius: 10px; font-family: inherit; font-size: 13px; outline: none; margin-bottom: 10px; }
+  .key-btn { width: 100%; background: var(--accent); color: #000; border: none; padding: 14px; border-radius: 10px;
+    font-weight: 700; font-size: 15px; font-family: inherit; cursor: pointer; }
+  .key-note { font-size: 10px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.6; }
+
+  .up { color: var(--green); }
+  .dn { color: var(--red); }
+  .ac { color: var(--accent); }
+  .yl { color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="loading">⏳ 초기화 중...</div>
+</div>
+
+<script>
+// ── 설정 ──────────────────────────────────────────────────────────
+const PORTFOLIO = [
+  { ticker:"MXCT", name:"맥스사이트",      qty:106,      avgCost:6.28  },
+  { ticker:"IREN", name:"아이렌",          qty:25,       avgCost:11.82 },
+  { ticker:"TSLA", name:"테슬라",          qty:0.000528, avgCost:271.7 },
+  { ticker:"KULR", name:"KULR 테크놀로지", qty:52,       avgCost:26.88 },
+];
+const KRW = 1380;
+const TARGET = 2099339 * 2;
+const FINNHUB_KEY = localStorage.getItem("fh_key") || "";
+
+// ── 상태 ─────────────────────────────────────────────────────────
+let state = {
+  key: FINNHUB_KEY,
+  quotes: {},      // { MXCT: {price,chg,pct,pc} }
+  candles: {},     // { MXCT: [{o,h,l,c}] }
+  loading: {},
+  selIdx: 0,
+  tab: "port",
+  drop: false,
+  chat: [],
+  busy: false,
+  wsStatus: "off",
+};
+let wsConn = null;
+let pollTimer = null;
+
+// ── 유틸 ─────────────────────────────────────────────────────────
+function fmt(n, d=3) { return Number(n).toFixed(d); }
+function krw(n) { return Math.round(n).toLocaleString("ko-KR"); }
+
+function calcRSI(cl) {
+  if (!cl || cl.length < 15) return 50;
+  let g=0, l=0;
+  for (let i=cl.length-14; i<cl.length; i++) {
+    const d=cl[i]-cl[i-1]; if(d>0) g+=d; else l-=d;
+  }
+  return +( 100 - 100/(1 + g/(l||0.001)) ).toFixed(1);
+}
+function calcMA(cl, p) {
+  if (!cl || cl.length < p) return null;
+  return +(cl.slice(-p).reduce((a,b)=>a+b,0)/p).toFixed(3);
+}
+function getSig(r) {
+  if (r<30) return { label:"강한 매수", color:"#00ff9d", bg:"#00ff9d22" };
+  if (r<40) return { label:"매수 고려", color:"#6ee7b7", bg:"#6ee7b722" };
+  if (r>70) return { label:"강한 매도", color:"#ff4466", bg:"#ff446622" };
+  if (r>60) return { label:"매도 고려", color:"#fca5a5", bg:"#fca5a522" };
+  return           { label:"중립 관망", color:"#ffd700", bg:"#ffd70022" };
+}
+
+function genCandles(base, drift=0) {
+  const out=[]; let p=Math.max(base,0.01);
+  for (let i=89; i>=0; i--) {
+    const d=new Date(); d.setDate(d.getDate()-i);
+    if(d.getDay()===0||d.getDay()===6) continue;
+    const v=(Math.random()-0.47+drift)*p*0.03;
+    const o=Math.max(p*(1+(Math.random()-0.5)*0.005),0.001);
+    const c=Math.max(o+v,0.001);
+    out.push({o:+o.toFixed(3), h:+(Math.max(o,c)*1.006).toFixed(3), l:+(Math.min(o,c)*0.994).toFixed(3), c:+c.toFixed(3)});
+    p=c;
+  }
+  return out;
+}
+const DRIFTS = {MXCT:-0.008, IREN:0.002, TSLA:0.001, KULR:-0.010};
+
+// ── API ───────────────────────────────────────────────────────────
+async function fetchQuote(ticker) {
+  const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${state.key}`);
+  const d = await res.json();
+  if (d && d.c > 0) {
+    state.quotes[ticker] = { price:d.c, chg:d.d||0, pct:d.dp||0, pc:d.pc||d.c };
+  }
+}
+
+async function fetchCandle(ticker) {
+  state.loading[ticker] = true;
+  try {
+    const to = Math.floor(Date.now()/1000);
+    const from = to - 86400*90;
+    const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from}&to=${to}&token=${state.key}`);
+    const d = await res.json();
+    if (d.s==="ok" && d.c && d.c.length>1) {
+      state.candles[ticker] = d.t.map((_,i)=>({
+        o:+(d.o[i]||0).toFixed(3), h:+(d.h[i]||0).toFixed(3),
+        l:+(d.l[i]||0).toFixed(3), c:+(d.c[i]||0).toFixed(3)
+      })).filter(x=>x.c>0);
+    } else {
+      state.candles[ticker] = genCandles(PORTFOLIO.find(p=>p.ticker===ticker)?.avgCost||1, DRIFTS[ticker]||0);
+    }
+  } catch {
+    state.candles[ticker] = genCandles(PORTFOLIO.find(p=>p.ticker===ticker)?.avgCost||1, DRIFTS[ticker]||0);
+  }
+  state.loading[ticker] = false;
+}
+
+async function pollAll() {
+  for (const p of PORTFOLIO) {
+    try { await fetchQuote(p.ticker); } catch {}
+    await new Promise(r=>setTimeout(r,300));
+  }
+  render();
+}
+
+function startWS() {
+  if (wsConn) wsConn.close();
+  const ws = new WebSocket(`wss://ws.finnhub.io?token=${state.key}`);
+  wsConn = ws;
+  ws.onopen = () => {
+    state.wsStatus = "live";
+    PORTFOLIO.forEach(p => ws.send(JSON.stringify({type:"subscribe", symbol:p.ticker})));
+    render();
+  };
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type==="trade" && msg.data) {
+        msg.data.forEach(t => {
+          if (!t.s || !t.p) return;
+          const old = state.quotes[t.s] || {};
+          const pc = old.pc || t.p;
+          state.quotes[t.s] = { price:t.p, chg:+(t.p-pc).toFixed(3), pct:+((t.p-pc)/pc*100).toFixed(2), pc, ts:t.t };
+        });
+        render();
+      }
+    } catch {}
+  };
+  ws.onclose = () => { state.wsStatus = "off"; render(); };
+  ws.onerror = () => { state.wsStatus = "err"; render(); };
+}
+
+async function init() {
+  // 시뮬 캔들 먼저
+  PORTFOLIO.forEach(p => {
+    if (!state.candles[p.ticker]) state.candles[p.ticker] = genCandles(p.avgCost, DRIFTS[p.ticker]||0);
+  });
+  render();
+  // 실시간 캔들 fetch
+  for (const p of PORTFOLIO) {
+    fetchCandle(p.ticker).then(render);
+    await new Promise(r=>setTimeout(r,400));
+  }
+  // Quote 폴링
+  pollAll();
+  pollTimer = setInterval(pollAll, 15000);
+  // WebSocket
+  startWS();
+}
+
+// ── 스파크라인 SVG ────────────────────────────────────────────────
+function sparkSVG(closes, w=70, h=24) {
+  if (!closes || closes.length<2) return `<svg width="${w}" height="${h}"></svg>`;
+  const mn=Math.min(...closes), mx=Math.max(...closes), r=mx-mn||1;
+  const pts=closes.map((v,i)=>`${(i/(closes.length-1))*w},${h-((v-mn)/r)*h}`).join(" ");
+  const col = closes.at(-1)>=closes[0]?"#00ff9d":"#ff4466";
+  return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`;
+}
+
+// ── 캔들차트 SVG ─────────────────────────────────────────────────
+function candleSVG(data) {
+  if (!data || data.length<2) return `<div class="loading">📡 로딩 중...</div>`;
+  const d=data.slice(-25);
+  const mn=Math.min(...d.map(x=>x.l)), mx=Math.max(...d.map(x=>x.h)), r=mx-mn||1;
+  const W=340, H=160, sw=W/d.length, cw=Math.max(sw-2,2);
+  const y=v=>((mx-v)/r)*H;
+  let lines = [0.25,0.5,0.75].map(f=>`<line x1="0" y1="${H*f}" x2="${W}" y2="${H*f}" stroke="#1e2d45" stroke-width="0.5" stroke-dasharray="3,4"/>`).join("");
+  let bars = d.map((c,i)=>{
+    const x=i*sw+sw/2, up=c.c>=c.o, col=up?"#00ff9d":"#ff4466";
+    const bt=Math.min(y(c.o),y(c.c)), bh=Math.max(Math.abs(y(c.c)-y(c.o)),1);
+    return `<g><line x1="${x}" y1="${y(c.h)}" x2="${x}" y2="${y(c.l)}" stroke="${col}" stroke-width="1"/><rect x="${x-cw/2}" y="${bt}" width="${cw}" height="${bh}" fill="${col}" opacity="0.85"/></g>`;
+  }).join("");
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}">${lines}${bars}</svg>`;
+}
+
+// ── RSI 게이지 SVG ───────────────────────────────────────────────
+function rsiSVG(v) {
+  const val=Math.max(0,Math.min(100,Number(v)||50));
+  const a=(val/100)*Math.PI, px=55-Math.cos(a)*42, py=55-Math.sin(a)*42;
+  const col=val<30?"#00ff9d":val>70?"#ff4466":"#ffd700";
+  return `<svg width="110" height="65" viewBox="0 0 110 65">
+    <path d="M13,55 A42,42 0 0,1 97,55" fill="none" stroke="#1e2d45" stroke-width="7" stroke-linecap="round"/>
+    <path d="M13,55 A42,42 0 0,1 ${px},${py}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round"/>
+    <text x="55" y="50" text-anchor="middle" fill="${col}" font-size="16" font-weight="700" font-family="monospace">${val}</text>
+    <text x="55" y="62" text-anchor="middle" fill="#45526a" font-size="8" font-family="monospace">RSI(14)</text>
+  </svg>`;
+}
+
+// ── 렌더링 ───────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById("app");
+  if (!state.key) { app.innerHTML = keyScreenHTML(); bindKeyScreen(); return; }
+
+  const sel = PORTFOLIO[state.selIdx];
+  const sq = state.quotes[sel.ticker];
+  const sc = state.candles[sel.ticker] || [];
+  const curPrice = sq?.price || sc.at(-1)?.c || sel.avgCost;
+  const chg = sq?.chg || 0;
+  const pctVal = sq?.pct || 0;
+  const up = chg >= 0;
+  const closes = sc.map(x=>x.c);
+  const R = calcRSI(closes);
+  const M5 = calcMA(closes,5);
+  const M20 = calcMA(closes,20);
+  const SIG = getSig(R);
+
+  const rows = PORTFOLIO.map((p,i) => {
+    const q = state.quotes[p.ticker];
+    const cd = state.candles[p.ticker]||[];
+    const pr = q?.price || cd.at(-1)?.c || p.avgCost;
+    const mkt = pr*KRW*p.qty;
+    const cost = p.avgCost*KRW*p.qty;
+    const pnl = mkt-cost;
+    const pnlPct = +((pnl/cost)*100).toFixed(1);
+    const cl = cd.map(x=>x.c);
+    const r = calcRSI(cl);
+    const sig = getSig(r);
+    return {...p, i, pr, mkt, pnl, pnlPct, r, sig, hasLive:!!(q?.price)};
+  });
+
+  const totMkt  = rows.reduce((a,b)=>a+b.mkt,0);
+  const totCost = rows.reduce((a,b)=>a+b.avgCost*KRW*b.qty,0);
+  const totPnl  = totMkt-totCost;
+  const totPct  = +((totPnl/totCost)*100).toFixed(1);
+  const need    = +((TARGET-totMkt)/totMkt*100).toFixed(1);
+  const prog    = Math.min((totMkt/TARGET)*100,100);
+
+  const wsLabel = {live:"● LIVE", off:"○ 연결중", err:"✕ 오류"}[state.wsStatus]||"○";
+  const wsColor = {live:"#00ff9d", off:"#ffd700", err:"#ff4466"}[state.wsStatus]||"#ffd700";
+
+  app.innerHTML = `
+  <!-- 헤더 -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="header-title">◈ 내 포트폴리오</span>
+      <span class="live-dot" style="color:${wsColor}">${wsLabel}</span>
+    </div>
+    <button class="btn-ticker" onclick="toggleDrop()">${sel.ticker} ▾</button>
+  </div>
+
+  <!-- 드롭다운 -->
+  ${state.drop ? `
+  <div class="overlay" onclick="toggleDrop()">
+    <div class="dropdown" onclick="event.stopPropagation()">
+      ${rows.map(r=>`
+      <div class="drop-item ${r.i===state.selIdx?'active':''}" onclick="selectTicker(${r.i})">
+        <div>
+          <span class="drop-ticker" style="color:${r.i===state.selIdx?'#00d4ff':'#cdd6f4'}">${r.ticker}</span>
+          ${r.hasLive?`<span class="badge" style="color:#00ff9d;background:#00ff9d22">LIVE</span>`:''}
+          <div class="drop-name">${r.name} · ${r.qty}주</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px">$${fmt(r.pr)}</div>
+          <div style="font-size:11px;color:${r.pnlPct>=0?'#00ff9d':'#ff4466'}">${r.pnlPct>=0?'+':''}${r.pnlPct}%</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>` : ''}
+
+  <!-- 가격바 -->
+  <div class="price-bar">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="price-name">${sel.name} · 평균 $${sel.avgCost}
+          ${sq?.price?`<span class="badge" style="color:#00ff9d;background:#00ff9d22;font-size:8px;margin-left:6px">● 실시간</span>`:''}
+        </div>
+        <div class="price-main">
+          <span class="price-num">$${fmt(curPrice)}</span>
+          <span class="price-chg" style="color:${up?'#00ff9d':'#ff4466'}">
+            ${up?'▲':'▼'} $${fmt(Math.abs(chg))} (${up?'+':''}${fmt(pctVal,2)}%)
+          </span>
+        </div>
+        <div class="price-avg">전일비 기준 · ${sq?.ts?new Date(sq.ts).toLocaleTimeString('ko-KR'):'-'}</div>
+      </div>
+      <div class="sig-badge" style="background:${SIG.bg};color:${SIG.color};border:1px solid ${SIG.color}44">
+        ${SIG.label}
+        <div class="sig-sub">RSI ${R}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 탭 콘텐츠 -->
+  <div class="content">
+
+    <!-- 포트폴리오 -->
+    <div class="tab-pane ${state.tab==='port'?'active':''}">
+      <!-- 2배 트래커 -->
+      <div class="tracker">
+        <div style="font-size:10px;color:#00d4ff;margin-bottom:10px">🎯 2배 목표 트래커</div>
+        <div class="tracker-grid">
+          <div><div class="tracker-label">현재 평가금</div><div class="tracker-val">${krw(totMkt)}원</div></div>
+          <div><div class="tracker-label">목표 (2배)</div><div class="tracker-val" style="color:#ffd700">${krw(TARGET)}원</div></div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>
+        <div class="progress-labels"><span>${prog.toFixed(1)}% 달성</span><span style="color:#00d4ff">+${need}% 필요</span></div>
+      </div>
+
+      <!-- 요약 -->
+      <div class="summary-grid">
+        ${[
+          ["평가금", `${krw(totMkt)}원`, "#00d4ff"],
+          ["총 손익", `${totPnl>=0?'+':''}${krw(totPnl)}원`, totPnl>=0?"#00ff9d":"#ff4466"],
+          ["수익률", `${totPct>=0?'+':''}${totPct}%`, totPct>=0?"#00ff9d":"#ff4466"],
+          ["실시간", state.wsStatus==="live"?"연결됨 ●":"연결중", state.wsStatus==="live"?"#00ff9d":"#ffd700"],
+        ].map(([l,v,c])=>`
+        <div class="summary-item">
+          <div class="summary-label">${l}</div>
+          <div class="summary-val" style="color:${c}">${v}</div>
+        </div>`).join('')}
+      </div>
+
+      <!-- 종목 카드 -->
+      ${rows.map(r=>`
+      <div class="stock-card" style="background:#161b27;border:1px solid ${r.pnl>=0?'#00ff9d33':'#ff446633'}" onclick="selectAndChart(${r.i})">
+        <div class="stock-header">
+          <div class="stock-left">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <span class="ticker">${r.ticker}</span>
+              ${r.hasLive?`<span class="badge" style="color:#00ff9d;background:#00ff9d22">LIVE</span>`:''}
+              <span class="badge" style="color:${r.sig.color};background:${r.sig.bg}">${r.sig.label}</span>
+            </div>
+            <div class="info">${r.name} · ${r.qty}주</div>
+            <div class="prices">평균 $${r.avgCost} → $${fmt(r.pr)}</div>
+          </div>
+          <div class="stock-right">
+            <div class="mkt">${krw(r.mkt)}원</div>
+            <div class="pnl" style="color:${r.pnl>=0?'#00ff9d':'#ff4466'}">${r.pnl>=0?'+':''}${krw(r.pnl)}원</div>
+            <div class="pnl" style="color:${r.pnl>=0?'#00ff9d':'#ff4466'}">${r.pnlPct>=0?'+':''}${r.pnlPct}%</div>
+          </div>
+        </div>
+        <div class="rsi-row">
+          <span style="font-size:10px;color:#45526a">RSI</span>
+          <div class="rsi-track"><div class="rsi-fill" style="width:${r.r}%;background:${r.r<30?'#00ff9d':r.r>70?'#ff4466':'#ffd700'}"></div></div>
+          <span class="rsi-num" style="color:${r.r<30?'#00ff9d':r.r>70?'#ff4466':'#ffd700'}">${r.r}</span>
+          ${sparkSVG((state.candles[r.ticker]||[]).map(x=>x.c))}
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- 차트 -->
+    <div class="tab-pane ${state.tab==='chart'?'active':''}">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span class="card-title">CANDLESTICK · ${sel.ticker} · 최근 25일</span>
+          ${state.loading[sel.ticker]?`<span style="font-size:9px;color:#ffd700">로딩중...</span>`:
+            sq?.price?`<span style="font-size:9px;color:#00ff9d">● 실시간</span>`:`<span style="font-size:9px;color:#45526a">시뮬</span>`}
+        </div>
+        ${candleSVG(sc)}
+        <div class="chart-info">
+          <span style="color:#00ff9d">■ 양봉</span>
+          <span style="color:#ff4466">■ 음봉</span>
+          ${M5?`<span style="color:#ffd700">MA5 $${M5}</span>`:''}
+          ${M20?`<span style="color:#00d4ff">MA20 $${M20}</span>`:''}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 ${sel.ticker} 상세</div>
+        ${[
+          ["현재가", `$${fmt(curPrice)}`, up?"#00ff9d":"#ff4466"],
+          ["평균 매수가", `$${sel.avgCost}`, "#8899aa"],
+          ["전일 대비", `${chg>=0?'+':''}$${fmt(chg)} (${fmt(pctVal,2)}%)`, up?"#00ff9d":"#ff4466"],
+          ["전일 종가", sq?.pc?`$${fmt(sq.pc)}`:"—", "#8899aa"],
+          ["수량", `${sel.qty}주`, "#cdd6f4"],
+          ["평가금", `${krw(curPrice*KRW*sel.qty)}원`, "#00d4ff"],
+          ["손익", `${((curPrice-sel.avgCost)/sel.avgCost*100).toFixed(2)}%`, curPrice>=sel.avgCost?"#00ff9d":"#ff4466"],
+        ].map(([l,v,c])=>`<div class="detail-row"><span style="color:#45526a">${l}</span><span style="color:${c};font-weight:600">${v}</span></div>`).join('')}
+      </div>
+    </div>
+
+    <!-- 지표 -->
+    <div class="tab-pane ${state.tab==='ind'?'active':''}">
+      <div class="ind-grid">
+        <div class="card" style="display:flex;flex-direction:column;align-items:center">
+          ${rsiSVG(R)}
+          <div class="gauge-label" style="color:${R<30?'#00ff9d':R>70?'#ff4466':'#ffd700'}">
+            ${R<30?'과매도':R>70?'과매수':'중립'}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:8px">이동평균선</div>
+          ${[["MA 5일",M5],["MA 20일",M20]].map(([l,v])=>`
+          <div class="ma-row"><span style="color:#45526a">${l}</span><span style="color:${v&&curPrice>v?'#00ff9d':'#ff4466'}">${v?`$${v}`:"—"}</span></div>`).join('')}
+          <div style="font-size:10px;color:#45526a;margin-top:8px">현재가</div>
+          <div style="font-size:16px;font-weight:700;margin-top:2px">$${fmt(curPrice)}</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">종목별 RSI 현황</div>
+        ${rows.map(r=>`
+        <div class="rsi-all-row">
+          <span class="rsi-all-ticker">${r.ticker}</span>
+          <div class="rsi-all-track"><div class="rsi-fill" style="width:${r.r}%;background:${r.r<30?'#00ff9d':r.r>70?'#ff4466':'#ffd700'}"></div></div>
+          <span style="font-size:11px;color:${r.r<30?'#00ff9d':r.r>70?'#ff4466':'#ffd700'};min-width:24px">${r.r}</span>
+          <span class="badge" style="color:${r.sig.color};background:${r.sig.bg}">${r.sig.label}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- AI분석 -->
+    <div class="tab-pane ${state.tab==='ai'?'active':''}">
+      <div class="ai-notice">🤖 실시간 포트폴리오 데이터 기반 AI 분석</div>
+      ${["내 포트폴리오 올해 2배 가능할까?",`${sel.ticker} 지금 손절 vs 홀딩?`,"KULR -83% 어떻게 해야 해?","MXCT -80% 어떻게 해야 해?","2배 목표 달성 전략 짜줘"].map(q=>
+        `<button class="quick-btn" onclick="askAI('${q}')" ${state.busy?'disabled':''} style="margin-bottom:0">${q}</button>`
+      ).join('')}
+      <div class="chat-area" id="chatArea">
+        ${state.chat.length===0?`<div class="chat-empty">위 버튼 또는 직접 질문하세요</div>`:
+          state.chat.map(m=>`
+          <div class="chat-row ${m.r==='u'?'user':''}">
+            <div class="chat-bubble ${m.r==='u'?'user':'ai'}">
+              ${m.r==='a'?`<div class="ai-label">◈ AI ANALYST</div>`:''}
+              ${m.t.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInput" placeholder="직접 질문..." ${state.busy?'disabled':''} onkeydown="if(event.key==='Enter')askAI(this.value)">
+        <button class="send-btn" onclick="sendChat()" ${state.busy?'disabled':''}>${state.busy?'···':'→'}</button>
+      </div>
+      <button class="clear-btn" onclick="clearChat()">대화 초기화</button>
+    </div>
+
+  </div>
+
+  <!-- 하단 탭바 -->
+  <div class="tabbar">
+    ${[["port","💼","포트폴리오"],["chart","📊","차트"],["ind","📐","지표"],["ai","🤖","AI분석"]].map(([id,icon,label])=>`
+    <button class="tab-btn ${state.tab===id?'active':''}" onclick="setTab('${id}')">
+      <span class="tab-icon">${icon}</span>
+      <span class="tab-label">${label}</span>
+    </button>`).join('')}
+  </div>
+  `;
+
+  // 채팅 스크롤
+  const ca = document.getElementById("chatArea");
+  if (ca) ca.scrollTop = ca.scrollHeight;
+}
+
+// ── 이벤트 핸들러 ─────────────────────────────────────────────────
+function toggleDrop() { state.drop=!state.drop; render(); }
+function selectTicker(i) { state.selIdx=i; state.drop=false; state.chat=[]; render(); }
+function selectAndChart(i) { state.selIdx=i; state.tab="chart"; render(); }
+function setTab(t) { state.tab=t; state.drop=false; render(); }
+function clearChat() { state.chat=[]; render(); }
+function sendChat() {
+  const inp = document.getElementById("chatInput");
+  if (inp && inp.value.trim()) askAI(inp.value.trim());
+}
+
+async function askAI(msg) {
+  if (!msg || state.busy) return;
+  state.busy = true;
+  state.chat.push({r:"u", t:msg});
+  state.chat.push({r:"a", t:"분석 중..."});
+  render();
+
+  const sel = PORTFOLIO[state.selIdx];
+  const rows = PORTFOLIO.map(p => {
+    const q=state.quotes[p.ticker], cd=state.candles[p.ticker]||[];
+    const pr=q?.price||cd.at(-1)?.c||p.avgCost;
+    const mkt=pr*KRW*p.qty, cost=p.avgCost*KRW*p.qty;
+    const pnlPct=+((( mkt-cost)/cost)*100).toFixed(1);
+    return `${p.ticker}(${p.name}): ${p.qty}주 | 평균$${p.avgCost} | 현재$${fmt(pr)} | ${pnlPct}% | RSI ${calcRSI(cd.map(x=>x.c))}`;
+  });
+
+  const totMkt  = PORTFOLIO.reduce((a,p)=>{const q=state.quotes[p.ticker],cd=state.candles[p.ticker]||[];const pr=q?.price||cd.at(-1)?.c||p.avgCost;return a+pr*KRW*p.qty;},0);
+  const totCost = PORTFOLIO.reduce((a,p)=>a+p.avgCost*KRW*p.qty,0);
+  const totPct  = +((( totMkt-totCost)/totCost)*100).toFixed(1);
+  const need    = +((TARGET-totMkt)/totMkt*100).toFixed(1);
+  const sc = state.candles[sel.ticker]||[];
+  const R = calcRSI(sc.map(x=>x.c));
+  const SIG = getSig(R);
+  const curPrice = state.quotes[sel.ticker]?.price || sc.at(-1)?.c || sel.avgCost;
+
+  const sys = `당신은 미국 주식 전문 AI 애널리스트입니다. 한국어로 간결하고 실용적으로 답변하세요.
+[포트폴리오]
+총 평가금: ${krw(totMkt)}원 | 목표(2배): ${krw(TARGET)}원 | 필요: +${need}% | 손익: ${totPct}%
+${rows.join('\n')}
+분석 종목: ${sel.ticker} | $${fmt(curPrice)} | RSI:${R} | ${SIG.label}
+투자 권유가 아닌 참고용이며 리스크를 반드시 언급하세요.`;
+
+  const history = state.chat.slice(0,-1).map(m=>({role:m.r==="u"?"user":"assistant",content:m.t}));
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:sys,messages:history}),
+    });
+    const d = await res.json();
+    state.chat[state.chat.length-1] = {r:"a", t:d.content?.[0]?.text||"응답 없음"};
+  } catch(e) {
+    state.chat[state.chat.length-1] = {r:"a", t:"⚠️ AI 연결 오류: "+e.message};
+  }
+  state.busy = false;
+  render();
+}
+
+// ── API 키 화면 ───────────────────────────────────────────────────
+function keyScreenHTML() {
+  return `<div class="key-screen">
+    <div class="key-box">
+      <span class="key-emoji">🔑</span>
+      <div class="key-title">Finnhub API 키 입력</div>
+      <div class="key-desc">finnhub.io에서 무료로 발급받은<br>API 키를 입력하세요<br><br>실시간 주가 + AI 분석이 모두 작동합니다</div>
+      <input class="key-input" id="keyInput" placeholder="API 키 붙여넣기..." type="password">
+      <button class="key-btn" onclick="saveKey()">연결 시작 →</button>
+      <div class="key-note">🔒 키는 이 기기에만 저장됩니다<br>finnhub.io → Dashboard → API Key</div>
+    </div>
+  </div>`;
+}
+function bindKeyScreen() {
+  const inp = document.getElementById("keyInput");
+  if (inp) inp.addEventListener("keydown", e=>{ if(e.key==="Enter") saveKey(); });
+}
+function saveKey() {
+  const inp = document.getElementById("keyInput");
+  const k = inp?.value?.trim();
+  if (!k) return;
+  localStorage.setItem("fh_key", k);
+  state.key = k;
+  render();
+  init();
+}
+
+// ── 시작 ─────────────────────────────────────────────────────────
+if (state.key) {
+  init();
+} else {
+  render();
+  setTimeout(bindKeyScreen, 100);
+}
+</script>
+</body>
+</html>
